@@ -73,13 +73,12 @@ def edit_data_arriving(**kwargs):
     #                    'vehicle': vehicle_list,
     #                    'company_name': company_name_list}
 
-    # загружается словарь в метадату по ключу key
+    # загружает списки
     ti.xcom_push(key='arriving_edit', value=arrival_list)
     ti.xcom_push(key='arriving_edit1', value=route_name_list)
     ti.xcom_push(key='arriving_edit2', value=number_plane_list)
     ti.xcom_push(key='arriving_edit3', value=vehicle_list)
     ti.xcom_push(key='arriving_edit4', value=company_name_list)
-
 
 
 with DAG(
@@ -111,28 +110,16 @@ with DAG(
                                         company_name TEXT)
                                     """,
     )
-    # берем данные из XCOM с таска edit_data и передаем функцию .iloc  в которой указывается колво строк с указанными индексами в нужном порядке
     insert_edit_data_in_table = PostgresOperator(
         task_id="insert_edit_data_in_table",
         postgres_conn_id="PostgreSQL",
 
         sql="""INSERT INTO flight_schedule 
         VALUES(
-         (%s, '{{ ti.xcom_pull(task_ids='edit_data_arriving', key='arriving_edit') }}', %s),
-         (%s, '{{ ti.xcom_pull(task_ids='edit_data_arriving', key='arriving_edit1') }}', %s),
-         (%s, '{{ ti.xcom_pull(task_ids='edit_data_arriving', key='arriving_edit2') }}', %s),
-         (%s, '{{ ti.xcom_pull(task_ids='edit_data_arriving', key='arriving_edit3') }}', %s),
-         (%s, '{{ ti.xcom_pull(task_ids='edit_data_arriving', key='arriving_edit4') }}', %s))
+        {{ti.xcom_pull(task_ids='edit_data_arriving', key='arriving_edit')[0]}},
+        {{ti.xcom_pull(task_ids='edit_data_arriving', key='arriving_edit1')[0]}},
+        {{ti.xcom_pull(task_ids='edit_data_arriving', key='arriving_edit2')[0]}},
+        {{ti.xcom_pull(task_ids='edit_data_arriving', key='arriving_edit3')[0]}},
+        {{ti.xcom_pull(task_ids='edit_data_arriving', key='arriving_edit4')[0]}})
         """)
-
-    # sql="""
-    # INSERT INTO flight_schedule (arrival, route_name, number_plane, vehicle, company_name) VALUES
-    #
-
-    # '{{{{ti.xcom_pull(key='vehicle_edit_flight_schedule_arriving', task_ids=['edit_data_arriving']).iloc[{i}]['vehicle']}}}}',
-
-    #     """)
-
     get_data_arriving >> edit_data_arriving >> create_table_for_edit_data >> insert_edit_data_in_table
-
-    # если не получается text.py пробуем через скачиваемый файл добавлять в бд как в туториале
