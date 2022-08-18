@@ -2,7 +2,6 @@ from datetime import datetime
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.postgres.operators.postgres import PostgresOperator
-import pandas as pd
 import requests
 
 default_args = {
@@ -44,11 +43,11 @@ def edit_data_arriving(**kwargs):
     for index in range(len(schedule)):
         # получаем время и дату
         search_arrival = schedule[index]['arrival']
-        d1 = search_arrival[0:10]
-        d2 = search_arrival[11:19]
-        date_format = d1 + ' ' + d2
 
-        arrival_list.append(date_format)
+        # делаю так потому что datetime через json 'Object of type datetime is not JSON serializable', без datetime БД высчитывает дату и результат добавляет в бд
+        # а мог бы к примеру date = datetime.strftime(search_arrival[0:19], "%Y-%m-%dT%H:%M:%S")
+        date_arriving = search_arrival[0:10]
+        arrival_list.append(date_arriving)
 
         # получаем маршруты
         search_route_name = schedule[index]['thread']['title']
@@ -66,23 +65,17 @@ def edit_data_arriving(**kwargs):
         search_company_name = schedule[index]['thread']['carrier']['title']
         company_name_list.append(search_company_name)
 
+    result_arriving = {'arrival': arrival_list,
+                       'route_name': route_name_list,
+                       'number_plane': number_plane_list,
+                       'vehicle': vehicle_list,
+                       'company_name': company_name_list}
     # возвращает словарь , где содержатся выбранные данные из апи по ключам
-    # result_arriving = {'arrival': arrival_list,
-    #                    'route_name': route_name_list,
-    #                    'number_plane': number_plane_list,
-    #                    'vehicle': vehicle_list,
-    #                    'company_name': company_name_list}
-
-    # загружает списки
-    ti.xcom_push(key='arriving_edit', value=arrival_list)
-    ti.xcom_push(key='arriving_edit1', value=route_name_list)
-    ti.xcom_push(key='arriving_edit2', value=number_plane_list)
-    ti.xcom_push(key='arriving_edit3', value=vehicle_list)
-    ti.xcom_push(key='arriving_edit4', value=company_name_list)
+    ti.xcom_push(key='arriving_edit', value=result_arriving)
 
 
 with DAG(
-        dag_id='flight_schedule',
+        dag_id='flight_schedule_v01',
         default_args=default_args,
         schedule_interval='@daily',
         catchup=False,
@@ -113,13 +106,14 @@ with DAG(
     insert_edit_data_in_table = PostgresOperator(
         task_id="insert_edit_data_in_table",
         postgres_conn_id="PostgreSQL",
+        sql=[f"""INSERT INTO flight_schedule VALUES(
+                                            
+                                 {{{{ti.xcom_pull(key='arriving_edit', task_ids=['edit_data_arriving'])[0]['arrival'][{i}]}}}},
+                                '{{{{ti.xcom_pull(key='arriving_edit', task_ids=['edit_data_arriving'])[0]['route_name'][{i}]}}}}',
+                                '{{{{ti.xcom_pull(key='arriving_edit', task_ids=['edit_data_arriving'])[0]['number_plane'][{i}]}}}}',
+                                '{{{{ti.xcom_pull(key='arriving_edit', task_ids=['edit_data_arriving'])[0]['vehicle'][{i}]}}}}',
+                                '{{{{ti.xcom_pull(key='arriving_edit', task_ids=['edit_data_arriving'])[0]['company_name'][{i}]}}}}')
+                                """ for i in range(38)]
+    )
 
-        sql="""INSERT INTO flight_schedule 
-        VALUES(
-        {{ti.xcom_pull(task_ids='edit_data_arriving', key='arriving_edit')[0]}},
-        {{ti.xcom_pull(task_ids='edit_data_arriving', key='arriving_edit1')[0]}},
-        {{ti.xcom_pull(task_ids='edit_data_arriving', key='arriving_edit2')[0]}},
-        {{ti.xcom_pull(task_ids='edit_data_arriving', key='arriving_edit3')[0]}},
-        {{ti.xcom_pull(task_ids='edit_data_arriving', key='arriving_edit4')[0]}})
-        """)
     get_data_arriving >> edit_data_arriving >> create_table_for_edit_data >> insert_edit_data_in_table
