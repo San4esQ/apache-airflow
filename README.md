@@ -4,3 +4,4 @@
 * Apache airflow 2.3.0
 * Yandex API
 * PostgreSQL 13
+* docker-compose
