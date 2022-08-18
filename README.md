@@ -1,3 +1,6 @@
-# test apache/airflow
+# Тестовое задание с использованием Apache airflow
 
-* development process
+В проекте используется:
+* Apache airflow 2.3.0
+* Yandex API
+* PostgreSQL 13
