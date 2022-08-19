@@ -6,4 +6,4 @@
 * PostgreSQL 13
 * docker-compose
 
-# Тестовые значения для запуска docker в файле .env_test
+# Тестовые значения для docker-compose в файле .env_test
