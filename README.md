@@ -5,3 +5,5 @@
 * Yandex API
 * PostgreSQL 13
 * docker-compose
+
+# Тестовые значения для запуска docker в файле .env_test
